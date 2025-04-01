@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -186,31 +185,19 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, currentEthPrice, current
         </div>
       </div>
 
-      <div className="flex space-x-2 pb-2">
+      <Tabs value={activeCrypto} onValueChange={(value) => setActiveCrypto(value as 'combined' | CryptoType)}>
         <TabsList className="bg-white border">
-          <TabsTrigger 
-            value="combined" 
-            className={activeCrypto === 'combined' ? 'bg-gray-100' : ''}
-            onClick={() => setActiveCrypto('combined')}
-          >
+          <TabsTrigger value="combined">
             Combined
           </TabsTrigger>
-          <TabsTrigger 
-            value="eth" 
-            className={activeCrypto === 'ETH' ? 'bg-gray-100' : ''}
-            onClick={() => setActiveCrypto('ETH')}
-          >
+          <TabsTrigger value="ETH">
             <EthLogo size={16} className="mr-1" /> ETH
           </TabsTrigger>
-          <TabsTrigger 
-            value="btc" 
-            className={activeCrypto === 'BTC' ? 'bg-gray-100' : ''}
-            onClick={() => setActiveCrypto('BTC')}
-          >
+          <TabsTrigger value="BTC">
             <BtcLogo size={16} className="mr-1" /> BTC
           </TabsTrigger>
         </TabsList>
-      </div>
+      </Tabs>
 
       {renderSummaryCards()}
 
