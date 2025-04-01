@@ -1,31 +1,51 @@
 
 import React, { createContext, useState, useEffect } from 'react';
-import { DCAPurchase, DCASummary } from '@/types/eth';
-import { calculateDCASummary, generateSampleData } from '@/utils/ethUtils';
+import { DCAPurchase, CryptoSummary, CryptoType } from '@/types/eth';
+import { calculateCryptoSummaries, generateSampleData } from '@/utils/ethUtils';
 
 interface DCAPurchasesContextType {
   purchases: DCAPurchase[];
   currentEthPrice: number;
-  summary: DCASummary;
+  currentBtcPrice: number;
+  summary: CryptoSummary;
   addPurchase: (purchase: DCAPurchase) => void;
   deletePurchase: (id: string) => void;
-  updateCurrentEthPrice: (price: number) => void;
+  updateCurrentPrice: (price: number, cryptoType: CryptoType) => void;
 }
 
 export const DCAPurchasesContext = createContext<DCAPurchasesContextType>({
   purchases: [],
   currentEthPrice: 0,
+  currentBtcPrice: 0,
   summary: {
-    totalInvested: 0,
-    totalEth: 0,
-    averageCostBasis: 0,
-    currentValue: 0,
-    profitLoss: 0,
-    profitLossPercentage: 0
+    ETH: {
+      totalInvested: 0,
+      totalAmount: 0,
+      averageCostBasis: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0
+    },
+    BTC: {
+      totalInvested: 0,
+      totalAmount: 0,
+      averageCostBasis: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0
+    },
+    combined: {
+      totalInvested: 0,
+      totalAmount: 0,
+      averageCostBasis: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0
+    }
   },
   addPurchase: () => {},
   deletePurchase: () => {},
-  updateCurrentEthPrice: () => {}
+  updateCurrentPrice: () => {}
 });
 
 interface DCAPurchasesProviderProps {
@@ -34,14 +54,33 @@ interface DCAPurchasesProviderProps {
 
 export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ children }) => {
   const [purchases, setPurchases] = useState<DCAPurchase[]>([]);
-  const [currentEthPrice, setCurrentEthPrice] = useState<number>(2750); // Default price
-  const [summary, setSummary] = useState<DCASummary>({
-    totalInvested: 0,
-    totalEth: 0,
-    averageCostBasis: 0,
-    currentValue: 0,
-    profitLoss: 0,
-    profitLossPercentage: 0
+  const [currentEthPrice, setCurrentEthPrice] = useState<number>(2750); // Default ETH price
+  const [currentBtcPrice, setCurrentBtcPrice] = useState<number>(35000); // Default BTC price
+  const [summary, setSummary] = useState<CryptoSummary>({
+    ETH: {
+      totalInvested: 0,
+      totalAmount: 0,
+      averageCostBasis: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0
+    },
+    BTC: {
+      totalInvested: 0,
+      totalAmount: 0,
+      averageCostBasis: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0
+    },
+    combined: {
+      totalInvested: 0,
+      totalAmount: 0,
+      averageCostBasis: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0
+    }
   });
 
   // Effect to load data from local storage on initial render
@@ -49,11 +88,14 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
     try {
       const savedPurchases = localStorage.getItem('dcaPurchases');
       const savedEthPrice = localStorage.getItem('currentEthPrice');
+      const savedBtcPrice = localStorage.getItem('currentBtcPrice');
       
       if (savedPurchases) {
         const parsedPurchases = JSON.parse(savedPurchases).map((p: any) => ({
           ...p,
-          date: new Date(p.date)
+          date: new Date(p.date),
+          // Ensure cryptoType is set for backward compatibility
+          cryptoType: p.cryptoType || 'ETH'
         }));
         setPurchases(parsedPurchases);
       } else {
@@ -63,6 +105,10 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
       
       if (savedEthPrice) {
         setCurrentEthPrice(parseFloat(savedEthPrice));
+      }
+      
+      if (savedBtcPrice) {
+        setCurrentBtcPrice(parseFloat(savedBtcPrice));
       }
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
@@ -80,20 +126,21 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
     }
   }, [purchases]);
 
-  // Effect to save current ETH price to local storage whenever it changes
+  // Effect to save current crypto prices to local storage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem('currentEthPrice', currentEthPrice.toString());
+      localStorage.setItem('currentBtcPrice', currentBtcPrice.toString());
     } catch (error) {
-      console.error('Error saving ETH price to localStorage:', error);
+      console.error('Error saving crypto prices to localStorage:', error);
     }
-  }, [currentEthPrice]);
+  }, [currentEthPrice, currentBtcPrice]);
 
-  // Effect to recalculate summary whenever purchases or ETH price changes
+  // Effect to recalculate summary whenever purchases or crypto prices change
   useEffect(() => {
-    const newSummary = calculateDCASummary(purchases, currentEthPrice);
+    const newSummary = calculateCryptoSummaries(purchases, currentEthPrice, currentBtcPrice);
     setSummary(newSummary);
-  }, [purchases, currentEthPrice]);
+  }, [purchases, currentEthPrice, currentBtcPrice]);
 
   // Add a new DCA purchase
   const addPurchase = (purchase: DCAPurchase) => {
@@ -105,9 +152,13 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
     setPurchases(prev => prev.filter(p => p.id !== id));
   };
 
-  // Update the current ETH price
-  const updateCurrentEthPrice = (price: number) => {
-    setCurrentEthPrice(price);
+  // Update the current price for a specific cryptocurrency
+  const updateCurrentPrice = (price: number, cryptoType: CryptoType) => {
+    if (cryptoType === 'ETH') {
+      setCurrentEthPrice(price);
+    } else {
+      setCurrentBtcPrice(price);
+    }
   };
 
   return (
@@ -115,10 +166,11 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
       value={{
         purchases,
         currentEthPrice,
+        currentBtcPrice,
         summary,
         addPurchase,
         deletePurchase,
-        updateCurrentEthPrice
+        updateCurrentPrice
       }}
     >
       {children}

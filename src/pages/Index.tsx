@@ -8,9 +8,13 @@ import { DCAPurchasesContext } from "@/context/DCAPurchasesContext";
 
 // Wrapper component to use context
 const DCADashboardWithContext = () => {
-  const { summary, currentEthPrice } = useContext(DCAPurchasesContext);
+  const { summary, currentEthPrice, currentBtcPrice } = useContext(DCAPurchasesContext);
   
-  return <Dashboard summary={summary} currentEthPrice={currentEthPrice} />;
+  return <Dashboard 
+    summary={summary} 
+    currentEthPrice={currentEthPrice} 
+    currentBtcPrice={currentBtcPrice} 
+  />;
 };
 
 const Index = () => {

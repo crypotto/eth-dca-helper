@@ -3,6 +3,7 @@ import React from 'react';
 import { useContext } from 'react';
 import { DCAPurchasesContext } from '@/context/DCAPurchasesContext';
 import { formatUSD } from '@/utils/ethUtils';
+import { CryptoType } from '@/types/eth';
 import { 
   Area, 
   AreaChart, 
@@ -21,42 +22,109 @@ import {
 
 interface ChartData {
   date: string;
-  ethPrice: number;
-  ethAmount: number;
+  price: number;
+  amount: number;
   investment: number;
-  cumulativeEth: number;
+  cumulativeAmount: number;
   averageCostBasis: number;
+  cryptoType?: CryptoType;
 }
 
-const DCAPurchaseChart: React.FC = () => {
-  const { purchases, currentEthPrice } = useContext(DCAPurchasesContext);
+interface DCAPurchaseChartProps {
+  cryptoType?: CryptoType;
+}
+
+const DCAPurchaseChart: React.FC<DCAPurchaseChartProps> = ({ cryptoType }) => {
+  const { purchases, currentEthPrice, currentBtcPrice } = useContext(DCAPurchasesContext);
+
+  // Filter purchases by crypto type if specified
+  const filteredPurchases = cryptoType
+    ? purchases.filter(p => p.cryptoType === cryptoType)
+    : purchases;
+
+  // Determine chart color based on crypto type
+  const getChartColor = (type: CryptoType) => {
+    return type === 'ETH' ? '#627EEA' : '#F7931A';
+  };
 
   // Prepare the data for the chart
-  const chartData: ChartData[] = purchases.map((purchase, index) => {
-    const cumulativeEth = purchases
-      .slice(0, index + 1)
-      .reduce((total, p) => total + p.ethAmount, 0);
+  const chartData: ChartData[] = filteredPurchases.map((purchase, index) => {
+    // For combined view, we need to calculate cumulative values by crypto type
+    const purchasesOfSameType = filteredPurchases
+      .filter(p => cryptoType ? true : p.cryptoType === purchase.cryptoType)
+      .filter((_, i) => i <= index);
     
-    const totalInvested = purchases
-      .slice(0, index + 1)
+    const cumulativeAmount = purchasesOfSameType
+      .reduce((total, p) => total + p.amount, 0);
+    
+    const totalInvested = purchasesOfSameType
       .reduce((total, p) => total + p.amountUSD, 0);
     
-    const averageCostBasis = totalInvested / cumulativeEth;
+    const averageCostBasis = totalInvested / cumulativeAmount;
 
     return {
       date: purchase.date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-      ethPrice: purchase.ethPrice,
-      ethAmount: purchase.ethAmount,
+      price: purchase.price,
+      amount: purchase.amount,
       investment: purchase.amountUSD,
-      cumulativeEth,
-      averageCostBasis
+      cumulativeAmount,
+      averageCostBasis,
+      cryptoType: purchase.cryptoType
     };
   });
 
+  // For combined view, we need a different approach
+  if (!cryptoType) {
+    return (
+      <div className="w-full space-y-8">
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium">Portfolio Growth Over Time</h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <ComposedChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis 
+                fontSize={12} 
+                tickLine={false} 
+                axisLine={false} 
+                tickFormatter={(value) => `$${value.toFixed(0)}`}
+              />
+              <Tooltip 
+                formatter={(value: number, name: string) => {
+                  if (name === 'ETH Investment' || name === 'BTC Investment') {
+                    return [formatUSD(value), name];
+                  }
+                  return [value, name];
+                }}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              <Legend />
+              <Bar 
+                dataKey="investment" 
+                name="Investment" 
+                fill="#7E69AB"
+                stackId="investment"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="price" 
+                stroke="#10B981" 
+                name="Price" 
+                dot={false}
+                legendType="none"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  }
+
+  // Single crypto type view
   return (
     <div className="w-full space-y-8">
       <div className="space-y-2">
-        <h3 className="text-lg font-medium">ETH Price vs. Your Average Cost</h3>
+        <h3 className="text-lg font-medium">{cryptoType} Price vs. Your Average Cost</h3>
         <ResponsiveContainer width="100%" height={250}>
           <ComposedChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -75,11 +143,11 @@ const DCAPurchaseChart: React.FC = () => {
             <Legend />
             <Line 
               type="monotone" 
-              dataKey="ethPrice" 
-              stroke="#627EEA" 
+              dataKey="price" 
+              stroke={getChartColor(cryptoType)} 
               strokeWidth={2} 
               dot={false} 
-              name="ETH Price"
+              name={`${cryptoType} Price`}
             />
             <Line 
               type="monotone" 
@@ -90,9 +158,9 @@ const DCAPurchaseChart: React.FC = () => {
               dot={false} 
               name="Your Avg. Cost"
             />
-            {currentEthPrice && (
+            {(cryptoType === 'ETH' ? currentEthPrice : currentBtcPrice) && (
               <Line 
-                dataKey={() => currentEthPrice} 
+                dataKey={() => cryptoType === 'ETH' ? currentEthPrice : currentBtcPrice} 
                 stroke="#10B981" 
                 strokeWidth={2} 
                 dot={false} 
@@ -104,7 +172,7 @@ const DCAPurchaseChart: React.FC = () => {
       </div>
       
       <div className="space-y-2">
-        <h3 className="text-lg font-medium">Accumulated ETH Over Time</h3>
+        <h3 className="text-lg font-medium">Accumulated {cryptoType} Over Time</h3>
         <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -113,18 +181,18 @@ const DCAPurchaseChart: React.FC = () => {
               fontSize={12} 
               tickLine={false} 
               axisLine={false} 
-              tickFormatter={(value) => `${value.toFixed(2)} ETH`}
+              tickFormatter={(value) => `${value.toFixed(cryptoType === 'BTC' ? 4 : 2)} ${cryptoType}`}
             />
             <Tooltip 
-              formatter={(value: number) => [`${value.toFixed(6)} ETH`]} 
+              formatter={(value: number) => [`${value.toFixed(cryptoType === 'BTC' ? 8 : 6)} ${cryptoType}`]} 
               labelFormatter={(label) => `Date: ${label}`}
             />
             <Area 
               type="monotone" 
-              dataKey="cumulativeEth" 
-              stroke="#627EEA" 
-              fill="#C7D7EB" 
-              name="Total ETH"
+              dataKey="cumulativeAmount" 
+              stroke={getChartColor(cryptoType)} 
+              fill={cryptoType === 'ETH' ? '#C7D7EB' : '#FCE5C8'} 
+              name={`Total ${cryptoType}`}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -146,7 +214,11 @@ const DCAPurchaseChart: React.FC = () => {
               formatter={(value: number) => [formatUSD(value)]} 
               labelFormatter={(label) => `Date: ${label}`}
             />
-            <Bar dataKey="investment" fill="#627EEA" name="USD Invested" />
+            <Bar 
+              dataKey="investment" 
+              fill={getChartColor(cryptoType)} 
+              name="USD Invested" 
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
