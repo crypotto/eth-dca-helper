@@ -2,15 +2,20 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { DCAPurchase, CryptoSummary, CryptoType } from '@/types/eth';
 import { calculateCryptoSummaries, generateSampleData } from '@/utils/ethUtils';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { v4 as uuidv4 } from 'uuid';
+import { toast } from '@/hooks/use-toast';
 
 interface DCAPurchasesContextType {
   purchases: DCAPurchase[];
   currentEthPrice: number;
   currentBtcPrice: number;
   summary: CryptoSummary;
-  addPurchase: (purchase: DCAPurchase) => void;
-  deletePurchase: (id: string) => void;
-  updateCurrentPrice: (price: number, cryptoType: CryptoType) => void;
+  addPurchase: (purchase: DCAPurchase) => Promise<void>;
+  deletePurchase: (id: string) => Promise<void>;
+  updateCurrentPrice: (price: number, cryptoType: CryptoType) => Promise<void>;
+  isLoading: boolean;
 }
 
 export const DCAPurchasesContext = createContext<DCAPurchasesContextType>({
@@ -43,9 +48,10 @@ export const DCAPurchasesContext = createContext<DCAPurchasesContextType>({
       profitLossPercentage: 0
     }
   },
-  addPurchase: () => {},
-  deletePurchase: () => {},
-  updateCurrentPrice: () => {}
+  addPurchase: async () => {},
+  deletePurchase: async () => {},
+  updateCurrentPrice: async () => {},
+  isLoading: true
 });
 
 interface DCAPurchasesProviderProps {
@@ -54,8 +60,8 @@ interface DCAPurchasesProviderProps {
 
 export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ children }) => {
   const [purchases, setPurchases] = useState<DCAPurchase[]>([]);
-  const [currentEthPrice, setCurrentEthPrice] = useState<number>(2750); // Default ETH price
-  const [currentBtcPrice, setCurrentBtcPrice] = useState<number>(35000); // Default BTC price
+  const [currentEthPrice, setCurrentEthPrice] = useState<number>(2750);
+  const [currentBtcPrice, setCurrentBtcPrice] = useState<number>(35000);
   const [summary, setSummary] = useState<CryptoSummary>({
     ETH: {
       totalInvested: 0,
@@ -82,59 +88,78 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
       profitLossPercentage: 0
     }
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
-  // Effect to load data from local storage on initial render
+  // Load user data from Supabase
   useEffect(() => {
-    try {
-      const savedPurchases = localStorage.getItem('dcaPurchases');
-      const savedEthPrice = localStorage.getItem('currentEthPrice');
-      const savedBtcPrice = localStorage.getItem('currentBtcPrice');
-      
-      if (savedPurchases) {
-        const parsedPurchases = JSON.parse(savedPurchases).map((p: any) => ({
-          ...p,
+    const fetchData = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        // Fetch user's DCA purchases
+        const { data: purchasesData, error: purchasesError } = await supabase
+          .from('dca_purchases')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: true });
+
+        if (purchasesError) {
+          throw purchasesError;
+        }
+
+        // Fetch user's price settings
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+          throw settingsError;
+        }
+
+        // Transform purchased data to match DCAPurchase type
+        const transformedPurchases: DCAPurchase[] = purchasesData ? purchasesData.map(p => ({
+          id: p.id,
           date: new Date(p.date),
-          // Ensure cryptoType is set for backward compatibility
-          cryptoType: p.cryptoType || 'ETH'
-        }));
-        setPurchases(parsedPurchases);
-      } else {
-        // Load sample data if no saved data exists
-        setPurchases(generateSampleData());
-      }
-      
-      if (savedEthPrice) {
-        setCurrentEthPrice(parseFloat(savedEthPrice));
-      }
-      
-      if (savedBtcPrice) {
-        setCurrentBtcPrice(parseFloat(savedBtcPrice));
-      }
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
-      // Load sample data if there's an error
-      setPurchases(generateSampleData());
-    }
-  }, []);
+          amountUSD: p.amount_usd,
+          price: p.price,
+          amount: p.amount,
+          cryptoType: p.crypto_type as CryptoType
+        })) : [];
 
-  // Effect to save purchases to local storage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('dcaPurchases', JSON.stringify(purchases));
-    } catch (error) {
-      console.error('Error saving purchases to localStorage:', error);
-    }
-  }, [purchases]);
+        setPurchases(transformedPurchases);
 
-  // Effect to save current crypto prices to local storage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('currentEthPrice', currentEthPrice.toString());
-      localStorage.setItem('currentBtcPrice', currentBtcPrice.toString());
-    } catch (error) {
-      console.error('Error saving crypto prices to localStorage:', error);
-    }
-  }, [currentEthPrice, currentBtcPrice]);
+        // Set price settings if they exist
+        if (settingsData) {
+          setCurrentEthPrice(settingsData.current_eth_price);
+          setCurrentBtcPrice(settingsData.current_btc_price);
+        }
+      } catch (error: any) {
+        console.error('Error fetching user data:', error);
+        toast({
+          title: "Error loading data",
+          description: error.message,
+          variant: "destructive",
+        });
+
+        // If this is the first time loading (no data), create sample data
+        if (purchases.length === 0) {
+          const sampleData = generateSampleData();
+          setPurchases(sampleData);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
 
   // Effect to recalculate summary whenever purchases or crypto prices change
   useEffect(() => {
@@ -142,22 +167,127 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
     setSummary(newSummary);
   }, [purchases, currentEthPrice, currentBtcPrice]);
 
+  // Save current prices to Supabase
+  const savePrices = async (ethPrice: number, btcPrice: number) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .upsert({
+          user_id: user.id,
+          current_eth_price: ethPrice,
+          current_btc_price: btcPrice,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error saving prices:', error);
+      toast({
+        title: "Error saving prices",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Add a new DCA purchase
-  const addPurchase = (purchase: DCAPurchase) => {
-    setPurchases(prev => [...prev, purchase].sort((a, b) => a.date.getTime() - b.date.getTime()));
+  const addPurchase = async (purchase: DCAPurchase) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save purchases",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Generate ID if not provided
+      const purchaseWithId = {
+        ...purchase,
+        id: purchase.id || uuidv4()
+      };
+
+      // Insert into Supabase
+      const { error } = await supabase
+        .from('dca_purchases')
+        .insert({
+          id: purchaseWithId.id,
+          user_id: user.id,
+          date: purchaseWithId.date.toISOString(),
+          amount_usd: purchaseWithId.amountUSD,
+          price: purchaseWithId.price,
+          amount: purchaseWithId.amount,
+          crypto_type: purchaseWithId.cryptoType
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      setPurchases(prev => 
+        [...prev, purchaseWithId].sort((a, b) => a.date.getTime() - b.date.getTime())
+      );
+
+      toast({
+        title: "Purchase added",
+        description: `Successfully added ${purchaseWithId.cryptoType} purchase`,
+      });
+    } catch (error: any) {
+      console.error('Error adding purchase:', error);
+      toast({
+        title: "Error adding purchase",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   // Delete a DCA purchase
-  const deletePurchase = (id: string) => {
-    setPurchases(prev => prev.filter(p => p.id !== id));
+  const deletePurchase = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('dca_purchases')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setPurchases(prev => prev.filter(p => p.id !== id));
+      
+      toast({
+        title: "Purchase deleted",
+        description: "Transaction has been removed successfully",
+      });
+    } catch (error: any) {
+      console.error('Error deleting purchase:', error);
+      toast({
+        title: "Error deleting purchase",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   // Update the current price for a specific cryptocurrency
-  const updateCurrentPrice = (price: number, cryptoType: CryptoType) => {
+  const updateCurrentPrice = async (price: number, cryptoType: CryptoType) => {
     if (cryptoType === 'ETH') {
       setCurrentEthPrice(price);
+      if (user) {
+        await savePrices(price, currentBtcPrice);
+      }
     } else {
       setCurrentBtcPrice(price);
+      if (user) {
+        await savePrices(currentEthPrice, price);
+      }
     }
   };
 
@@ -170,7 +300,8 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
         summary,
         addPurchase,
         deletePurchase,
-        updateCurrentPrice
+        updateCurrentPrice,
+        isLoading
       }}
     >
       {children}
