@@ -108,13 +108,13 @@ export const generateSampleData = (): DCAPurchase[] => {
       cryptoType: 'ETH'
     });
 
-    // Also generate BTC purchases
+    // Also generate BTC purchases with more realistic prices
     if (i < 6) { // Fewer BTC purchases for variety
       const btcDate = new Date(date);
       btcDate.setDate(btcDate.getDate() + 15); // Offset by 15 days
       
-      // Generate BTC price between $20,000 and $50,000
-      const btcPrice = 20000 + Math.random() * 30000;
+      // More realistic BTC prices between $30,000 and $85,000 (recent range)
+      const btcPrice = 30000 + Math.random() * 55000;
       const btcAmountUSD = 300; // Different DCA amount for BTC
       const btcAmount = calculateCryptoAmount(btcAmountUSD, btcPrice);
       

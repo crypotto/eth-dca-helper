@@ -19,6 +19,14 @@ const DCAPurchaseTable: React.FC<DCAPurchaseTableProps> = ({ cryptoType }) => {
     ? purchases.filter(p => p.cryptoType === cryptoType)
     : purchases;
 
+  // Format date as DD/MM/YYYY to match the screenshot
+  const formatDate = (date: Date): string => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   return (
     <div className="overflow-auto">
       <Table>
@@ -34,7 +42,7 @@ const DCAPurchaseTable: React.FC<DCAPurchaseTableProps> = ({ cryptoType }) => {
         <TableBody>
           {filteredPurchases.map((purchase) => (
             <TableRow key={purchase.id}>
-              <TableCell>{purchase.date.toLocaleDateString()}</TableCell>
+              <TableCell>{formatDate(purchase.date)}</TableCell>
               {!cryptoType && (
                 <TableCell>
                   <div className="flex items-center">
