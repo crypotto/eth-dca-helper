@@ -1,13 +1,32 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { DCAPurchasesProvider } from "@/context/DCAPurchasesContext";
+import Dashboard from "@/components/Dashboard";
+import AddPurchaseForm from "@/components/AddPurchaseForm";
+import CurrentPriceUpdater from "@/components/CurrentPriceUpdater";
+import { useContext } from "react";
+import { DCAPurchasesContext } from "@/context/DCAPurchasesContext";
+
+// Wrapper component to use context
+const DCADashboardWithContext = () => {
+  const { summary, currentEthPrice } = useContext(DCAPurchasesContext);
+  
+  return <Dashboard summary={summary} currentEthPrice={currentEthPrice} />;
+};
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <DCAPurchasesProvider>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container py-8">
+          <DCADashboardWithContext />
+          
+          <div className="grid gap-6 mt-8 md:grid-cols-2">
+            <AddPurchaseForm />
+            <CurrentPriceUpdater />
+          </div>
+        </div>
       </div>
-    </div>
+    </DCAPurchasesProvider>
   );
 };
 
