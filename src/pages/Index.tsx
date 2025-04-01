@@ -20,7 +20,7 @@ const DCADashboardWithContext = () => {
 const Index = () => {
   return (
     <DCAPurchasesProvider>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="container py-8">
           <DCADashboardWithContext />
           

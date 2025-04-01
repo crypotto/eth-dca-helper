@@ -64,7 +64,7 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				eth: {
-					light: '#C7D7EB',
+					light: '#7191C7',
 					DEFAULT: '#627EEA',
 					dark: '#28324E'
 				}
