@@ -1,7 +1,7 @@
 
 import React, { useState, useContext } from 'react';
 import { DCAPurchasesContext } from '@/context/DCAPurchasesContext';
-import { calculateEthAmount } from '@/utils/ethUtils';
+import { calculateCryptoAmount } from '@/utils/ethUtils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -12,19 +12,22 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { CryptoType } from '@/types/eth';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const AddPurchaseForm: React.FC = () => {
   const { addPurchase } = useContext(DCAPurchasesContext);
   const { toast } = useToast();
   const [date, setDate] = useState<Date>(new Date());
   const [amountUSD, setAmountUSD] = useState<string>('');
-  const [ethPrice, setEthPrice] = useState<string>('');
+  const [price, setPrice] = useState<string>('');
+  const [cryptoType, setCryptoType] = useState<CryptoType>('ETH');
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!date || !amountUSD || !ethPrice) {
+    if (!date || !amountUSD || !price) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -34,9 +37,9 @@ const AddPurchaseForm: React.FC = () => {
     }
 
     const amountUSDNumber = parseFloat(amountUSD);
-    const ethPriceNumber = parseFloat(ethPrice);
+    const priceNumber = parseFloat(price);
 
-    if (isNaN(amountUSDNumber) || isNaN(ethPriceNumber)) {
+    if (isNaN(amountUSDNumber) || isNaN(priceNumber)) {
       toast({
         title: "Error",
         description: "Please enter valid numbers",
@@ -45,7 +48,7 @@ const AddPurchaseForm: React.FC = () => {
       return;
     }
 
-    if (amountUSDNumber <= 0 || ethPriceNumber <= 0) {
+    if (amountUSDNumber <= 0 || priceNumber <= 0) {
       toast({
         title: "Error",
         description: "Values must be greater than zero",
@@ -54,24 +57,25 @@ const AddPurchaseForm: React.FC = () => {
       return;
     }
 
-    const ethAmount = calculateEthAmount(amountUSDNumber, ethPriceNumber);
+    const cryptoAmount = calculateCryptoAmount(amountUSDNumber, priceNumber);
     
     addPurchase({
       id: `purchase-${Date.now()}`,
       date,
       amountUSD: amountUSDNumber,
-      ethPrice: ethPriceNumber,
-      ethAmount
+      price: priceNumber,
+      amount: cryptoAmount,
+      cryptoType
     });
 
     toast({
       title: "Purchase added",
-      description: "Your DCA purchase has been successfully recorded"
+      description: `Your DCA purchase of ${cryptoType} has been successfully recorded`
     });
 
     // Reset form
     setAmountUSD('');
-    setEthPrice('');
+    setPrice('');
   };
 
   return (
@@ -111,6 +115,22 @@ const AddPurchaseForm: React.FC = () => {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="cryptoType">Cryptocurrency</Label>
+            <Select
+              value={cryptoType}
+              onValueChange={(value) => setCryptoType(value as CryptoType)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select cryptocurrency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
+                <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="amountUSD">Amount (USD)</Label>
             <Input
               id="amountUSD"
@@ -124,21 +144,21 @@ const AddPurchaseForm: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ethPrice">ETH Price (USD)</Label>
+            <Label htmlFor="price">{cryptoType} Price (USD)</Label>
             <Input
-              id="ethPrice"
+              id="price"
               type="number"
-              placeholder="e.g., 3000"
-              value={ethPrice}
-              onChange={(e) => setEthPrice(e.target.value)}
+              placeholder={`e.g., ${cryptoType === 'ETH' ? '3000' : '30000'}`}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
               step="0.01"
               min="0"
             />
           </div>
 
-          {amountUSD && ethPrice && !isNaN(parseFloat(amountUSD)) && !isNaN(parseFloat(ethPrice)) && (
+          {amountUSD && price && !isNaN(parseFloat(amountUSD)) && !isNaN(parseFloat(price)) && (
             <div className="text-sm text-muted-foreground">
-              You'll receive approximately {(parseFloat(amountUSD) / parseFloat(ethPrice)).toFixed(6)} ETH
+              You'll receive approximately {(parseFloat(amountUSD) / parseFloat(price)).toFixed(cryptoType === 'BTC' ? 8 : 6)} {cryptoType}
             </div>
           )}
         </CardContent>
