@@ -207,26 +207,29 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
     }
 
     try {
-      // Generate ID if not provided
-      const purchaseWithId = {
-        ...purchase,
-        id: purchase.id || uuidv4()
-      };
-
+      // Generate a proper UUID using the uuid library
+      const purchaseId = uuidv4();
+      
       // Insert into Supabase
       const { error } = await supabase
         .from('dca_purchases')
         .insert({
-          id: purchaseWithId.id,
+          id: purchaseId,
           user_id: user.id,
-          date: purchaseWithId.date.toISOString(),
-          amount_usd: purchaseWithId.amountUSD,
-          price: purchaseWithId.price,
-          amount: purchaseWithId.amount,
-          crypto_type: purchaseWithId.cryptoType
+          date: purchase.date.toISOString(),
+          amount_usd: purchase.amountUSD,
+          price: purchase.price,
+          amount: purchase.amount,
+          crypto_type: purchase.cryptoType
         });
 
       if (error) throw error;
+
+      // Update local state with the UUID
+      const purchaseWithId = {
+        ...purchase,
+        id: purchaseId
+      };
 
       // Update local state
       setPurchases(prev => 
@@ -235,7 +238,7 @@ export const DCAPurchasesProvider: React.FC<DCAPurchasesProviderProps> = ({ chil
 
       toast({
         title: "Purchase added",
-        description: `Successfully added ${purchaseWithId.cryptoType} purchase`,
+        description: `Successfully added ${purchase.cryptoType} purchase`,
       });
     } catch (error: any) {
       console.error('Error adding purchase:', error);

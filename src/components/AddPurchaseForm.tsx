@@ -1,4 +1,3 @@
-
 import React, { useState, useContext } from 'react';
 import { DCAPurchasesContext } from '@/context/DCAPurchasesContext';
 import { calculateCryptoAmount } from '@/utils/ethUtils';
@@ -60,17 +59,12 @@ const AddPurchaseForm: React.FC = () => {
     const cryptoAmount = calculateCryptoAmount(amountUSDNumber, priceNumber);
     
     addPurchase({
-      id: `purchase-${Date.now()}`,
+      id: '', // This will be replaced with a UUID in the context
       date,
       amountUSD: amountUSDNumber,
       price: priceNumber,
       amount: cryptoAmount,
       cryptoType
-    });
-
-    toast({
-      title: "Purchase added",
-      description: `Your DCA purchase of ${cryptoType} has been successfully recorded`
     });
 
     // Reset form
