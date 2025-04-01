@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { RefreshCw } from 'lucide-react';
+import { CryptoType } from '@/types/eth';
 
 const CurrentPriceUpdater: React.FC = () => {
-  const { currentEthPrice, updateCurrentEthPrice } = useContext(DCAPurchasesContext);
+  const { currentEthPrice, updateCurrentPrice } = useContext(DCAPurchasesContext);
   const [price, setPrice] = useState<string>(currentEthPrice.toString());
   const { toast } = useToast();
 
@@ -27,7 +28,7 @@ const CurrentPriceUpdater: React.FC = () => {
       return;
     }
     
-    updateCurrentEthPrice(newPrice);
+    updateCurrentPrice(newPrice, 'ETH');
     
     toast({
       title: "Price updated",
@@ -43,7 +44,7 @@ const CurrentPriceUpdater: React.FC = () => {
       if (data && data.ethereum && data.ethereum.usd) {
         const fetchedPrice = data.ethereum.usd;
         setPrice(fetchedPrice.toString());
-        updateCurrentEthPrice(fetchedPrice);
+        updateCurrentPrice(fetchedPrice, 'ETH');
         
         toast({
           title: "Price updated",
